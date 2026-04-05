@@ -2,7 +2,7 @@
 
 The content in this repository goes with teh demo posted to my youtube channel.
 
-- TOD: Add URL
+- [Lab: Introduction to SSH CA signed certificates](https://youtu.be/67RHMNVA8I4)
 
 The demo covers OpenSSH authentication using SSH CA signed certificates.
 

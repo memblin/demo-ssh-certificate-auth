@@ -1,8 +1,13 @@
 # Introduction to SSH Certificates
 
+## Links to open
+
+- The Repo, https://github.com/memblin/demo-ssh-certificate-auth
+- The Gist, https://gist.github.com/memblin/966bd13439e615a90b5053ca4c5f6bd8
+
 ## Intro
 
-Hello!
+Greetings and Hello!
 
 Today, I have a technical deep dive to share with you on the topic of how to
 use SSH Certificates for Linux system authentication.
@@ -156,7 +161,7 @@ host's key to a users `~/.ssh/known_hosts` file.
 **SHOW sshd CONFIG snippetss**
 
 ```bash
-# /etc/ssh/ssh_config.d/60-TrustedUserCAKeys
+# /etc/ssh/sshd_config.d/60-TrustedUserCAKeys
 TrustedUserCAKeys /etc/ssh/trusted_client_ca_keys
 
 # Contents of /etc/ssh/trusted_client_ca_keys; can have multiple CA Client / User CA keys
@@ -229,6 +234,11 @@ podman exec -it test01.local bash
 
 # Console 3: test02.local
 podman exec -it test02.local bash
+
+# On each container, create our users
+useradd --comment 'CA User' --create-home --shell /usr/bin/bash ca-user
+useradd --comment 'Role A' --create-home --shell /usr/bin/bash role-a
+useradd --comment 'role B' --create-home --shell /usr/bin/bash role-b
 ```
 
 #### CA Container
@@ -236,11 +246,6 @@ podman exec -it test02.local bash
 Launch and prepare the **ca.local** container.
 
 ```bash
-# Create our users
-useradd --comment 'CA User' --create-home --shell /usr/bin/bash ca-user
-useradd --comment 'Role A' --create-home --shell /usr/bin/bash role-a
-useradd --comment 'role B' --create-home --shell /usr/bin/bash role-b
-
 # Generate a user key pair that will be used to for accessing
 # the test systems via SSH from the ca.local machine.
 ssh-keygen -f $HOME/.ssh/id_ed25519 -t ed25519 -N ""
@@ -268,19 +273,14 @@ cat ssh_client_ca.pub
 Trust the Client/User CA public key to allow auth.
 
 ```bash
-# Create our users
-useradd --comment 'CA User' --create-home --shell /usr/bin/bash ca-user
-useradd --comment 'Role A' --create-home --shell /usr/bin/bash role-a
-useradd --comment 'Role B' --create-home --shell /usr/bin/bash role-b
-
 # Create a TrustedUserCAKeys file to contain trusted client or user CA public
 # keys on each target system containing the public key from our ssh_client_ca.
 export SSH_CLIENT_CA_PUB_KEY="FILL ME"
 echo "$SSH_CLIENT_CA_PUB_KEY" >> /etc/ssh/trusted_client_ca_keys
 
-# Write an ssh_config extention configuration file to enable sshd to read and
+# Write an sshd_config extention configuration file to enable sshd to read and
 # trust the public keys found in the trusted_client_ca_keys file.
-# /etc/ssh/ssh_config.d/60-TrustedUserCAKeys
+# /etc/ssh/sshd_config.d/60-TrustedUserCAKeys
 cat <<EOF > /etc/ssh/sshd_config.d/60-TrustedUserCAKeys.conf
 TrustedUserCAKeys /etc/ssh/trusted_client_ca_keys
 EOF
@@ -459,20 +459,20 @@ on all of the test accounts.
 #      times separated by a colon to indicate an explicit time interval.
 #      The "forever" time interval is valid but has security implictions.
 #
-# Allow any "principal" user by leaving out -n
-ssh-keygen -I admin-user -s $HOME/ssh_ca/ssh_client_ca -V +15m $HOME/.ssh/id_ed25519.pub
+# Allow only root user
+ssh-keygen -I admin-user -s $HOME/ssh_ca/ssh_client_ca -n root -V +15m $HOME/.ssh/id_ed25519.pub
 
 # Show the signed certiicate
 ssh-keygen -Lf $HOME/.ssh/id_ed25519-cert.pub 
 
-# Limit principals to a list of users by including -n
-ssh-keygen -I admin-user -s $HOME/ssh_ca/ssh_client_ca -n root,ca-user,role-a -V +15m $HOME/.ssh/id_ed25519.pub
+# Allow root, ca-user, and role-a access
+ssh-keygen -I admin-user -s $HOME/ssh_ca/ssh_client_ca -n ca-user,role-a -V +15m $HOME/.ssh/id_ed25519.pub
 
 # Show the signed certiicate
 ssh-keygen -Lf $HOME/.ssh/id_ed25519-cert.pub 
 
 # Limit principals to a list of users by including -n and disable some default options
-ssh-keygen -I admin-user -s $HOME/ssh_ca/ssh_client_ca -O no-port-forwarding -O no-X11-forwarding -n root,ca-user,role-a -V +15m $HOME/.ssh/id_ed25519.pub
+ssh-keygen -I admin-user -s $HOME/ssh_ca/ssh_client_ca -O no-port-forwarding -O no-X11-forwarding -n ca-user,role-a -V +15m $HOME/.ssh/id_ed25519.pub
 
 # Show the signed certiicate
 ssh-keygen -Lf $HOME/.ssh/id_ed25519-cert.pub 
@@ -547,7 +547,6 @@ the maximum validity window allows on your signed user certificates.
 [root@ca ssh_ca]# ssh-keygen -Qlf $HOME/ssh_ca/sshd_revoked_keys.krl
 # KRL version 2026040500
 # Generated at 20260405T032244
-
 ```
 
 Most SSH certificate recommendations I have seen recommend using a low and
@@ -658,7 +657,6 @@ standard work-day lengths or less with a default of say 15 minutes.
 Systems I have found that have some sort of SSH CA built in are:
 
 - [Hashicorp Vault: SSH Secrets Engine](https://developer.hashicorp.com/vault/docs/secrets/ssh)
-- [Teleport: How to Configure SSH Certificate-Based Authentication](https://goteleport.com/blog/how-to-configure-ssh-certificate-based-authentication/)
 
 And with that, I'll wrap up.
 
